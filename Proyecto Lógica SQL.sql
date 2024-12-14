@@ -39,7 +39,7 @@ WHERE "last_name" ILIKE '%Allen%' ;
 	  “film” y muestra la clasificación junto con el recuento. */
 
 SELECT "rating", 
-		COUNT (rating) AS Cantidad_Total_peliculas
+		COUNT ("rating") AS "Cantidad_Total_peliculas"
 FROM "film"  f 
 GROUP BY "rating" ;
 
@@ -52,14 +52,14 @@ WHERE "rating" = 'PG-13'OR "length" > 180 ;
 
 -- 9. Encuentra la variabilidad de lo que costaría reemplazar las películas.
 
-SELECT STDDEV (replacement_cost) AS "Variabilidad" -- Entiendo variabilidad como desviación estándar.
-FROM film f ;
+SELECT ROUND (STDDEV ("replacement_cost"), 2) AS "Variabilidad" -- Entiendo variabilidad como desviación estándar.
+FROM "film" f ;
 
 -- 10. Encuentra la mayor y menor duración de una película de nuestra BBDD.
 
 SELECT 
-	MAX (length) AS "Mayor_duracion", 
-	MIN (length) AS "Menor_duracion"
+	MAX ("length") AS "Mayor_duracion", 
+	MIN ("length") AS "Menor_duracion"
 FROM "film" f ;
 
 -- 11. Encuentra lo que costó el antepenúltimo alquiler ordenado por día.
@@ -83,7 +83,7 @@ WHERE "rating" NOT IN ('NC-17', 'G') ;
 	   promedio de duración. */
 
 SELECT "rating", 
-	    AVG (length) AS "Promedio_duracion"
+	    ROUND (AVG ("length"), 0) AS "Promedio_duracion"
 FROM "film" f 
 GROUP BY "rating" ;
 
@@ -95,7 +95,7 @@ WHERE "length" > 180 ;
 
 -- 15. ¿Cuánto dinero ha generado en total la empresa?
 
-SELECT SUM (amount) AS "Ingreso_Total"
+SELECT SUM ("amount") AS "Ingreso_Total"
 FROM "payment" p ;
 
 -- 16. Muestra los 10 clientes con mayor valor de id.
@@ -138,7 +138,7 @@ duración superior a 110 minutos y muestra el nombre de la categoría
 junto con el promedio de duración. */
 
 SELECT c."name" AS "categoria", 
-		AVG (f."length") AS "Promedio_duracion"
+		ROUND (AVG (f."length"), 0) AS "Promedio_duracion"
 FROM "film" f 
 INNER JOIN "film_category"fc 
 ON f."film_id" = fc."film_id" 
@@ -149,7 +149,7 @@ HAVING AVG (f."length") > 110 ;
 
 -- 21. ¿Cuál es la media de duración del alquiler de las películas?
 
-SELECT AVG ("rental_duration" ) AS "promedio_alquiler"
+SELECT ROUND (AVG ("rental_duration" ), 0) AS "promedio_alquiler"
 FROM "film" f ;
 
 -- 22. Crea una columna con el nombre y apellidos de todos los actores y actrices.
@@ -185,16 +185,16 @@ ORDER BY  "Mes_alquiler" ;
 
 -- 26. Encuentra el promedio, la desviación estándar y varianza del total pagado.
 
-SELECT AVG ("amount") AS "Promedio",
-		STDDEV ("amount") AS "Desviacion_del_Total",
-		VARIANCE ("amount") AS "Varianza"
+SELECT ROUND (AVG ("amount"), 2) AS "Promedio",
+		ROUND (STDDEV ("amount"), 2) AS "Desviacion_del_Total",
+		ROUND (VARIANCE ("amount"), 2) AS "Varianza"
 FROM "payment" p ;
 
 --27. ¿Qué películas se alquilan por encima del precio medio?
 
 SELECT "title" AS "pelicula",
 	   "rental_rate" AS "promedio_alquiler"
-FROM film f 
+FROM "film" f 
 WHERE "rental_rate" > (
 						SELECT AVG ("rental_rate")
 						FROM "film" );
@@ -210,10 +210,15 @@ HAVING COUNT ("film_id")> 40;
 -- 29. Obtener todas las películas y, si están disponibles en el inventario, mostrar la cantidad disponible.
 
 SELECT f."title" AS "pelicula" ,
-		COUNT (i."store_id") AS "Inventario_disponible"
+		COUNT (i."inventory_id") AS "Inventario_disponible"
 FROM "film" f 
 LEFT JOIN "inventory" i 
 ON f."film_id" = i."film_id"
+WHERE i."inventory_id" NOT IN (
+   							 SELECT r."inventory_id"
+    						 FROM "rental" r
+    						 WHERE r."return_date" IS NULL
+)
 GROUP BY f."title" 
 ORDER BY "Inventario_disponible" DESC ;
 
@@ -290,7 +295,7 @@ FROM "actor" a ;
 
 -- 38. Cuenta cuántos actores hay en la tabla “actor”.
 
-SELECT COUNT (actor_id) AS "Numero_Actores"
+SELECT COUNT ("actor_id") AS "Numero_Actores"
 FROM "actor" a ;
 
 -- 39. Selecciona todos los actores y ordénalos por apellido en orden ascendente.
@@ -313,6 +318,7 @@ SELECT "first_name" AS "Nombre",
 FROM "actor" a 
 GROUP BY "first_name"
 ORDER BY COUNT ("first_name") DESC ;
+-- Los nombres más repetidos son Kenneth, Penelope y Julia, 4 veces cada uno.
 
 -- 42. Encuentra todos los alquileres y los nombres de los clientes que los realizaron.
 
@@ -471,7 +477,8 @@ ORDER BY f."title"  ;
 película que pertenece a la categoría ‘Sci-Fi’. Ordena los resultados
 alfabéticamente por apellido. */
 
-SELECT CONCAT (a."first_name", ' ', a."last_name") AS "Actor-Actriz"
+SELECT DISTINCT a."first_name" AS "Nombre",
+				a."last_name" AS "Apellido"	
 FROM "actor" a 
 INNER JOIN "film_actor" fa 
 ON a."actor_id"  = fa."actor_id"
@@ -482,22 +489,33 @@ ON f."film_id" = fc."film_id"
 INNER JOIN "category" c 
 ON fc."category_id" = c."category_id"
 WHERE c."name" = 'Sci-Fi' 
-GROUP BY a."actor_id" 
 ORDER BY a."last_name" ;
 
 /* 55. Encuentra el nombre y apellido de los actores que han actuado en películas que se alquilaron 
        después de que la película ‘Spartacus Cheaper’ se alquilara por primera vez. Ordena los resultados
        alfabéticamente por apellido. */
 
-WITH Fecha_Inicial AS (
+SELECT DISTINCT a."first_name" AS "Nombre",
+				a."last_name" AS "Apellido"
+FROM "actor" a
+INNER JOIN "film_actor" fa 
+ON a."actor_id" = fa."actor_id"
+INNER JOIN "film" f
+ON fa."film_id" = f."film_id"
+INNER JOIN "inventory" i
+ON f."film_id" = i."film_id"
+INNER JOIN "rental" r 
+ON i."inventory_id" = r."inventory_id"
+WHERE r."rental_date" > (
 							SELECT  MIN(r."rental_date") AS "Fecha_alquiler_inicial"
 							FROM "rental" r 
 							INNER JOIN "inventory" i 
 							ON r."inventory_id" = i."inventory_id"
 							INNER JOIN "film" f 
 							ON i."film_id" = f."film_id"
-							WHERE f."title" ILIKE 'Spartacus Cheaper'; -- No sé como continuar
-
+							WHERE f."title" ILIKE 'Spartacus Cheaper'
+						) 
+ORDER BY a."last_name"  ; 
 
 /* 56. Encuentra el nombre y apellido de los actores que no han actuado en
 ninguna película de la categoría ‘Music’. */
